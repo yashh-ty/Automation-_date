@@ -1,0 +1,130 @@
+
+
+
+
+mb_mapper_excel={('Fund Transfer', 'IMPS', ''): ('Fund transfer','IMPS'),
+                 ('Fund Transfer', 'NEFT', ''): ('Fund transfer','NEFT'),
+                 ('Fund Transfer', 'RTGS', ''): ('Fund transfer','RTGS'),
+                 ('Fund Transfer', 'Within bank', ''): ('Fund transfer','Within bank'),
+                 ('Fund Transfer', 'SI-RECCURRING', ''): ("Fund transfer","SI RECURRING"),
+                 ('Fund Transfer', 'SI-ONE TIME', ''): ('Fund transfer','SI-ONE TIME'),
+                 ('Fund Transfer', 'Self Transfer', ''): ('Fund transfer','Self Transfer'),
+                 ('UPI Contribution', 'Merchant', 'BOI-Accounts'): ('UPI','To Merchant BOIAccount'),
+                 ('UPI Contribution', 'Merchant', 'Non-BOI Accounts'): ("UPI","To Merchant Non-BOI Account"),
+                 ('UPI Contribution', 'Retail', 'BOI-Accounts'): ('UPI','To Retail BOI Account'),
+                 ('UPI Contribution', 'Retail', 'Non-BOI Accounts'): ('UPI','To Retail Non-BOI Account'),
+                 ('UPI VPA Creation', '', ''): ('UPI','VPA Creation'),
+                 ('Credit card bill payment', '', ''): ('Credit-card Payment','CC-Payment'),
+                 ('SI Executed', '', 'ACTIVE'): ('SI Executed','ACTIVE'),
+                 ('SI Executed', '', 'COMPLETED'): ('SI Executed','COMPLETED'),
+                 ('SI Executed', '', 'CANCELLED'): ('SI Executed','CANCELLED'),
+                 ('SI Executed', '', 'PAUSED'): ('SI Executed','PAUSED'),
+                 ('Bill payments', '', ''): ('BillPay BillDesk','BPAY'),
+                 ('FD contribution', '', ''): ('TD Contribution','FD'),
+                 ('RD contribution', '', ''): ('TD Contribution','RD'),
+                 ('PPF contribution', '', ''): ('PPF Contribution','PPF'),
+                 ('SSY contribution', '', ''): ('SSY Contribution','SSY'),
+                 ('NPS contribution', 'Kfin', ''): ('NPS-KFINTECH Contribution','Kfintech trnx'),
+                 ('NPS contribution', 'NSDL', ''): ('NPS-NSDL Contribution','NSDL Contribution'),
+                 ('NPS contribution', 'NSDL SI recurring', ''): ('NPS-NSDL Contribution','NSDL-SI Recurring'),
+                 ('SGB contribution', '', ''): ('SGB Contribution','SGB'),
+                 ('FRSB contribution', '', ''): ('FRSB Contribution','FRSB'),
+                 ('MF lumpsum contribution', '', ''): ('MF-LUMSUM','MF-LUMPSUM'),
+                 ('BOI Multi Asset Allocation Fund(NFO)', '', ''): ('Multi Asset Allocation Fund','NFO'),
+                 ('APY Contribution', '', ''): None,
+                 ('Mssc Contribution', '', ''): None,
+                 ('PMSBY', '', ''): None,
+                 ('PMJJBY', '', ''): None,
+                 ('MF SIP contribution', '', ''): ('MF XSIP Order','MF-SIP'),
+                 ('Insurance purchases', '', ''): None,
+                 ('ASBA Applications', '', ''): ('ASBA Application','ASBA'),
+                 ('FD closed', '', ''): ('TD Closed','FD-Closed'),
+                 ('RD closed', '', ''): ('TD Closed','RD-Closed'),
+                 ('OD opened against FD', '', ''): ('FD','OD Contribution'),
+                 ('OD opened against RD', '', ''): ('RD','OD Contribution'),
+                 ('PPF', '', ''): ('PPF Opened','PPF-Opened'),
+                 ('SSY', '', ''): ('SSY Opened','SSY-Opened'),
+                 ('NPS', 'KFin', ''): ("NPS-KFINTECH account opened","Kfintech Account Opened"),
+                 ('NPS', 'NSDL', ''): ("NPS-NSDL account opened","NSDL Account Opened"),
+                 ('Insurance', 'Reliance', 'Vehicle'): ('INSUR Reliance Vehicle Premium','Insurance Purchase Contribution'),
+                 ('Insurance', 'Reliance', 'Health'): ('INSUR Reliance Health Premium','Insurance Purchase Contribution'),
+                 ('Insurance', 'SUD', 'Group'): ('SUDLIFE','Insurance Sudlife Purchase Contribution'),
+                 ('Insurance', 'SUD', 'Century Royale'): None,
+                 ('Insurance', 'SUD', 'Posh Sanchay'): None}
+
+
+ib_mapper_excel={('Fund Transfer', 'IMPS', ''): ("Fund transfer","IMPS"),
+        ('Fund Transfer', 'NEFT', ''): ("Fund transfer","NEFT"),
+        ('Fund Transfer', 'RTGS', ''): ("Fund transfer","RTGS"),
+        ('Fund Transfer', 'Within Bank', ''): ("Fund transfer","WITHINBOI"),
+        ('Fund Transfer', 'SI-RECCURRING', ''): ('Fund transfer',"SI-RECURRING"),
+        ('Fund Transfer', 'SI-ONE TIME', ''): ("Fund transfer","SI-ONE TIME"),
+        ('Fund Transfer', 'Self Transfer', ''): ("Fund transfer","SELF"),
+
+        ('Credit card bill payment', '', ''): ("Credit-card Payment","CC-Payment"),
+
+        ('SI Executed', '', 'ACTIVE'): ("SI Executed","ACTIVE",),
+        ('SI Executed', '', 'COMPLETED'): ("SI Executed",'COMPLETED'),
+        ('SI Executed', '', 'CANCELLED'): ("SI Executed",'CANCELLED'),
+        ('SI Executed', '', 'PAUSED'): ("SI Executed",'PAUSED'),
+
+        ('Bill Payments', 'BPAY', ''): ("BillPay BillDesk","BPAY"),
+        ('Bill Payments', 'Autopay', ''): ("BillPay BillDesk","Autopay"),
+
+        ('Tax Payment', 'Direct Tax', ''): ("Direct Tax",'Tax'),
+        ('Tax Payment', 'GST', ''): ("GST","Tax"),
+
+
+
+        ('Inward redirection', 'Bill Desk', ''): ('Bill Desk',"Inward Aggregator"),
+        ('Inward redirection', 'PayU', ''): ('PayU',"Inward Aggregator"),
+        ('Inward redirection', 'SabPaisa', ''): ('SabPaisa',"Inward Aggregator"),
+        ('Inward redirection', 'Wordline', ''): ('Worldline',"Inward Aggregator"),
+        ('Inward redirection', 'NTT Data', ''): ('NTTDATA',"Inward Aggregator"),
+        ('Inward redirection', 'Avenue Info', ''): ('Avenue Info',"Inward Aggregator"),
+
+        ('FD Contribution', '', ''): ("TD Contribution","FD"),
+        ('RD Contribution', '', ''): ("TD Contribution","RD"),
+        ('PPF Contribution', '', ''): ("PPF Contribution","PPF"),
+        ('SSY Contribution', '', ''): ("SSY Contribution","SSY"),
+        ('NPS Contribution', 'Kfin', ''): ("NPS-KFINTECH Contribution","Kfintech trnx"),
+        ('NPS Contribution', 'NSDL', ''): ("NPS-NSDL Contribution","NSDL Contribution"),
+        ('NPS Contribution', 'NSDL SI recurring', ''): ("NPS-NSDL Contribution","NSDL-SI Recurring"),
+
+        ('SGB Contribution', '', ''): ("SGB Contribution","SGB"),
+        ('FRSB Contribution', '', ''): ("FRSB Contribution","FRSB"),
+        ('MF lumpsum Contribution', '', ''): ("MF-LUMSUM","MF-LUMPSUM"),
+        ('', 'BOI Multi Asset Allocation Fund(NFO)', ''): ('Multi Asset Allocation  Fund',"NFO"),
+        ('MF SIP contribution', '', ''): ("MF XSIP Order","MF-SIP"),
+        ('Insurance purchases', '', ''):None ,
+        ('ASBA Applications', '', ''):("ASBA Application","ASBA"),
+        ('FD closed', '', ''): ("TD Closed","FD-Closed"),
+        ('RD closed', '', ''): ("TD Closed","RD-Closed"),
+        ('OD opened against FD', '', ''): ("OD Contribution","FD"),
+        ('OD opened against RD', '', ''): ("OD Contribution","RD"),
+        ('PPF', '', ''):("PPF Opened","PPF-Opened"),
+        ('SSY', '', ''): ("SSY Opened","SSY-Opened"),
+        ('NPS', 'Kfin', ''): ("NPS-KFINTECH account opened","Kfintech Account Opened"),
+        ('NPS', 'NSDL', ''): ("NPS-NSDL account opened","NSDL Account Opened"),
+        ('Insurance', 'Reliance', 'Vehicle'):("Insurance Purchase Contribution","INSUR Reliance Vehicle Premium") ,
+        # ('Insurance', '', 'Bajaj'): ("Bajaj Vehicle Insurance","NULL"),
+        ('Insurance', '', 'Health'): ("Insurance Purchase Contribution","INSUR Reliance Health Premium"),
+        ('Insurance', 'SUD', 'Group'): ("Insurance Sudlife Purchase Contribution","SUDLIFE"),
+        ('Insurance', 'SUD', 'Century Royale'): None,
+        ('Insurance', 'Reliance', 'Posh Sanchay'): None}
+
+
+
+corp_mapper_excel={
+ ('Fund Transfer', 'IMPS'): ("Fund transfer","IMPS"),
+ ('Fund Transfer', 'NEFT'): ("Fund transfer","NEFT"),
+ ('Fund Transfer', 'RTGS'): ("Fund transfer","RTGS"),
+ ('Fund Transfer', 'Within Bank'): ("Fund transfer","Within bank"),
+ ('Fund Transfer', 'Self Transfer'): ("Fund transfer","Self Transfer"),
+ ('Fund Transfer', 'BillPay'): ("Fund transfer","BILL_PAYMENT"),
+ ('BulkFundtransfer', 'IMPS'): ('Corp Bulk', 'IMPS'),
+ ('BulkFundtransfer', 'NEFT'): ('Corp Bulk', 'NEFT'),
+ ('BulkFundtransfer', 'RTGS'): ('Corp Bulk', 'RTGS')
+
+
+}
