@@ -1,0 +1,15 @@
+
+select 'APPLICATION_APPROVED' as status, count(*) from  customerprofile.tl_corp_regs_journey_dtls 
+where status = 'APPLICATION_APPROVED' and trunc(modified_dt)= current_date-1
+union
+select 'APPLICATION_IN_PROGRESS' as status, count(*) from  customerprofile.tl_corp_regs_journey_dtls 
+where status = 'APPLICATION_IN_PROGRESS' and trunc(modified_dt)= current_date-1
+union
+select 'APPLICATION_REJECTED' as status, count(*) from  customerprofile.tl_corp_regs_journey_dtls 
+where status = 'APPLICATION_REJECTED' and trunc(modified_dt)= current_date-1
+union
+select 'APPLICATION_SUBMITTED' as status, count(*) from  customerprofile.tl_corp_regs_journey_dtls 
+where status = 'APPLICATION_SUBMITTED' and trunc(modified_dt)= current_date-1
+union
+select 'JOURNEY_IN_PROGRESS' as status, count(*) from  customerprofile.tl_corp_regs_journey_dtls 
+where status = 'JOURNEY_IN_PROGRESS' and trunc(modified_dt)= current_date-1

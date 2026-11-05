@@ -1,0 +1,18 @@
+WITH report_dates AS (
+    SELECT (CURRENT_DATE - 1)::DATE AS yesterday
+)
+    SELECT 
+        CASE 
+            WHEN cust_type = 'SOLE_PROPRIETOR' THEN 'Sole_proprietor'
+            WHEN cust_type = 'CORPORATE' THEN 'Large corporate'
+        END AS corp_ib_count,
+        -- Cumulative Total Count (<= Yesterday)
+        COUNT(*)::BIGINT AS total,
+        -- Yesterday Count (Today column in Excel)
+        SUM(CASE WHEN TRUNC(modified_dt) = d.yesterday THEN 1 ELSE 0 END)::BIGINT AS today
+    FROM customerprofile.tl_corp_regs_journey_dtls
+    CROSS JOIN report_dates d
+    WHERE is_regs_completed = 'true'
+      AND cust_type IN ('SOLE_PROPRIETOR', 'CORPORATE')
+      AND TRUNC(modified_dt) <= d.yesterday
+    GROUP BY cust_type, d.yesterday

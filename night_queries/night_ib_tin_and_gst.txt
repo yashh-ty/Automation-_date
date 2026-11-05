@@ -1,0 +1,16 @@
+WITH report_dates AS (
+    SELECT 
+        (CURRENT_DATE - 1)::DATE AS yesterday,
+        DATE_TRUNC('month', CURRENT_DATE)::DATE AS month_start
+)
+SELECT 
+    tax_type::VARCHAR AS tax_name,
+    -- Month-to-Date Total (from month start to yesterday)
+    COALESCE(SUM(CASE WHEN (created_dt) between d.month_start and d.yesterday THEN success_cnt ELSE 0 END), 0)::BIGINT AS month,
+    -- Daily Total (Yesterday)
+    COALESCE(SUM(CASE WHEN TRUNC(created_dt) = d.yesterday THEN success_cnt ELSE 0 END), 0)::BIGINT AS day
+FROM moneymovement.tl_tax_reporting_dtls
+CROSS JOIN report_dates d
+WHERE UPPER(tax_type) IN ('GST', 'TIN')
+  AND TRUNC(created_dt) BETWEEN d.month_start AND d.yesterday
+GROUP BY tax_type;

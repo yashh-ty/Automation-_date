@@ -1,0 +1,31 @@
+WITH report_dates AS (
+    SELECT 
+        (CURRENT_DATE - 1)::DATE AS yesterday,
+        DATE_TRUNC('month', CURRENT_DATE)::DATE AS month_start,
+        CURRENT_DATE::DATE AS today
+)
+SELECT 
+    s.state::VARCHAR AS state,
+    -- Daily Metrics
+    SUM(CASE WHEN TRUNC(t.credit_dt) = d.yesterday THEN 1 ELSE 0 END)::BIGINT AS daily_count,
+    ROUND(COALESCE(SUM(CASE WHEN TRUNC(t.credit_dt) = d.yesterday THEN t.amt ELSE 0 END), 0), 2)::NUMERIC AS daily_amount,
+    -- Month-to-Date Metrics
+    SUM(CASE WHEN TRUNC(t.credit_dt) BETWEEN d.month_start AND d.yesterday THEN 1 ELSE 0 END)::BIGINT AS month_count,
+    ROUND(COALESCE(SUM(CASE WHEN TRUNC(t.credit_dt) BETWEEN d.month_start AND d.yesterday THEN t.amt ELSE 0 END), 0), 2)::NUMERIC AS month_amount
+FROM (
+    SELECT 'Maharashtra' AS state, 'MH' AS code
+    UNION ALL SELECT 'Odisha', 'OD'
+    UNION ALL SELECT 'TG', 'TG'
+    UNION ALL SELECT 'RJ', 'RJ'
+) s
+CROSS JOIN report_dates d
+LEFT JOIN (
+    SELECT 'MH' AS code, credit_dt, tot_amt AS amt FROM moneymovement.tl_mh_tax_pymt_dtls WHERE trnx_status = 'SUCCESS'
+    UNION ALL
+    SELECT 'OD' AS code, credit_dt, govt_amt AS amt FROM moneymovement.tl_odisha_tax_pymt_dtls WHERE trnx_status = 'SUCCESS'
+    UNION ALL
+    SELECT 'TG' AS code, credit_dt, amount AS amt FROM moneymovement.tl_tg_tax_pymt_dtls WHERE trnx_status = 'SUCCESS'
+    UNION ALL
+    SELECT 'RJ' AS code, credit_dt, amt AS amt FROM moneymovement.tl_rj_egras_tax_pymt_dtls WHERE trnx_status = 'SUCCESS'
+) t ON s.code = t.code AND TRUNC(t.credit_dt) BETWEEN d.month_start AND d.yesterday
+GROUP BY s.state;
