@@ -1,8 +1,8 @@
-import datetime
 import time
 from MB.mb_headers import *
 from openpyxl.cell.cell import MergedCell
 from REPORTS.utlis import *
+from REPORTS.report_date import sheet_headers
 from openpyxl.utils import get_column_letter
 start_time = time.time()
 
@@ -10,13 +10,11 @@ exception_rows=[5,24,27,44,46,51]
 
 
 
-def mb_generate_report(ws):
+def mb_generate_report(ws, report_date=None):
     headers_map = {}
     current_row = 5
     # 1. Main Headers
-    date = datetime.date.today().strftime(format="%d-%m-%Y")
-    left_header = date
-    right_header = f"MTD (1st to {date.split('-')[0]} July)"
+    left_header, right_header = sheet_headers(report_date)
     top_header(ws, "Summary Report", left_header, right_header)
 
     first_report_header(ws, 3)

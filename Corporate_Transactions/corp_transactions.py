@@ -1,17 +1,15 @@
 
 from REPORTS.utlis import *
+from REPORTS.report_date import sheet_headers
 from .func_corp import *
 from .corp_headers  import *
 from openpyxl.cell.cell import MergedCell
-import datetime
-def corp_generate_report(ws):
+def corp_generate_report(ws, report_date=None):
     headers_map = {}
     current_row = 6
     exception_rows=[3,4,15]
     # 1. Main Headers
-    date = datetime.date.today().strftime(format="%d-%m-%Y")
-    left_header = date
-    right_header = f"MTD (1st to {date.split('-')[0]} July)"
+    left_header, right_header = sheet_headers(report_date)
     top_header(ws, "Summary Report", left_header, right_header)
 
     first_report_header(ws,4)

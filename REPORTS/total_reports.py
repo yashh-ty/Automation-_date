@@ -12,6 +12,7 @@ from .mapper import mb_mapper_excel, ib_mapper_excel, corp_mapper_excel
 from .row_headers_excel import mb_data, corp_data, ib_data
 from .state_tax_report import state_tax
 from .Registration_report import reg_report
+from .report_date import prompt_report_date
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ReportTransformer")
@@ -45,6 +46,8 @@ def report_generation():
             print("❌ Invalid selection. Please enter A, B, or C.\n")
             continue  # Prevents execution of downstream code when input is invalid
 
+        report_date = prompt_report_date()
+
         os.makedirs(REPORTS_DIR, exist_ok=True)
         final_excel_path = os.path.join(REPORTS_DIR, report_name)
 
@@ -74,7 +77,7 @@ def report_generation():
             logger.info("Generating MB-Transactions Sheet...")
             ws_mb = wb.active
             ws_mb.title = "MB-Transactions"
-            mb_report.mb_generate_report(ws_mb)
+            mb_report.mb_generate_report(ws_mb, report_date)
 
             mb_daily_data = formatting_data(mb_daily_path)
             mb_monthly_data = formatting_data(mb_monthly_path)
@@ -86,7 +89,7 @@ def report_generation():
             # ----------------- 2. IB REPORT -----------------
             logger.info("Generating IB-Transactions Sheet...")
             ws_ib = wb.create_sheet(title="IB-Transactions")
-            ib_report.ib_generate_report(ws_ib)
+            ib_report.ib_generate_report(ws_ib, report_date)
 
             ib_daily_data = formatting_data(ib_daily_path)
             ib_monthly_data = formatting_data(ib_monthly_path)
@@ -98,7 +101,7 @@ def report_generation():
             # ----------------- 3. CORPORATE REPORT -----------------
             logger.info("Generating Corporate-Transactions Sheet...")
             ws_corp = wb.create_sheet(title="Corporate-Transactions")
-            corp_transactions.corp_generate_report(ws_corp)
+            corp_transactions.corp_generate_report(ws_corp, report_date)
 
             corp_daily_data = formatting_data(corp_daily_path)
             corp_monthly_data = formatting_data(corp_monthly_path)

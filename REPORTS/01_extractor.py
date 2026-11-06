@@ -3,6 +3,11 @@ import csv
 import logging
 import psycopg2
 from psycopg2 import Error
+
+try:
+    from report_date import apply_report_date, prompt_report_date
+except ImportError:
+    from REPORTS.report_date import apply_report_date, prompt_report_date
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("RawQueryExtractor")
 
@@ -83,7 +88,7 @@ def load_sql(file_path_queries,filename: str):
 #Report Timeline are only NIGHT_REPORT_PIPELINE_STEPS  or DAY_REPORT_PIPELINE_STEPS  depending on them there are
 #different queries stored in different file_paths
 
-def extract_and_dump_csv(report_timeline,pipeline_type):
+def extract_and_dump_csv(report_timeline, pipeline_type, report_date=None):
     """Executes SQL queries and writes exact result sets directly to CSV files."""
     # os.makedirs(STAGING_CSV_DIR, exist_ok=True)
     conn = None
@@ -103,7 +108,8 @@ def extract_and_dump_csv(report_timeline,pipeline_type):
         cursor = conn.cursor()
 
         for sheet_name, info in report_timeline.items():
-            sql_query = load_sql(sql_dir,info["sql_file"])
+            sql_query = load_sql(sql_dir, info["sql_file"])
+            sql_query = apply_report_date(sql_query, info["sql_file"], report_date)
             logger.info(f"Executing query for '{sheet_name}'...")
 
             cursor.execute(sql_query)
@@ -158,8 +164,13 @@ def run_extraction_cli():
 
     choice = input("\nSelect Option (A or B): ").strip().upper()
 
+    if choice in ("A", "B"):
+        report_date = prompt_report_date()
+    else:
+        report_date = None
+
     if choice == "A":
-        success = extract_and_dump_csv(NIGHT_REPORT_PIPELINE_STEPS,'NIGHT_REPORT_PIPELINE_STEPS')
+        success = extract_and_dump_csv(NIGHT_REPORT_PIPELINE_STEPS, 'NIGHT_REPORT_PIPELINE_STEPS', report_date)
         if success:
             print("Now you can successfully run the report_generation.bat file ")
             return True
@@ -170,7 +181,7 @@ def run_extraction_cli():
             return False
 
     elif choice == "B":
-        success = extract_and_dump_csv(DAY_REPORT_PIPELINE_STEPS,'DAY_REPORT_PIPELINE_STEPS')
+        success = extract_and_dump_csv(DAY_REPORT_PIPELINE_STEPS, 'DAY_REPORT_PIPELINE_STEPS', report_date)
         if success:
             print("Now you can successfully run the report_generation.bat file ")
             return True

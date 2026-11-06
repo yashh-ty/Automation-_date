@@ -3,6 +3,11 @@ import psycopg2
 import csv
 import logging
 
+try:
+    from report_date import apply_report_date, prompt_report_date
+except ImportError:
+    from REPORTS.report_date import apply_report_date, prompt_report_date
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("RawQueryExtractor")
 
@@ -55,6 +60,7 @@ POSTGRES_CONFIG = {
 
 conn = None
 cursor = None
+report_date = prompt_report_date()
 
 try:
     logger.info("Connecting to Database...")
@@ -63,6 +69,7 @@ try:
 
     for sheet_name, info in report_timeline.items():
         sql_query = load_sql(sql_dir, info["sql_file"])
+        sql_query = apply_report_date(sql_query, info["sql_file"], report_date)
         logger.info(f"Executing query for '{sheet_name}'...")
 
         cursor.execute(sql_query)

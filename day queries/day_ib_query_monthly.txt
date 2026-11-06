@@ -1,0 +1,526 @@
+WITH report_dates AS (
+    SELECT 
+        date_trunc('month', CURRENT_DATE)::DATE AS month_start,
+        CURRENT_DATE::DATE AS today
+),
+
+cra_targets AS (
+    SELECT 'NSDL' AS cra_code, 'NPS-NSDL account opened' AS service_name, 'NSDL Account Opened' AS type_name
+    UNION ALL
+    SELECT 'KFINTECH' AS cra_code, 'NPS-KFINTECH account opened' AS service_name, 'Kfintech Account Opened' AS type_name
+)
+
+
+
+
+-- 1. Fund Transfers (tl_transaction_dtls - Non-scheduled)
+SELECT 
+    'Fund transfer'::VARCHAR AS service,
+    trnx_mode::VARCHAR AS type,
+    SUM(CASE WHEN trnx_status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN trnx_status = 'Success' THEN trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN trnx_status = 'Failed' AND trnx_status_desc NOT LIKE '%Maximum transfer limit%' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN trnx_status = 'Failed' AND trnx_status_desc NOT LIKE '%Maximum transfer limit%' THEN trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM moneymovement.tl_transaction_dtls CROSS JOIN report_dates d
+WHERE schedule_pymt_id IS NULL 
+  AND TRUNC(created_dt) between month_start and today
+  AND channel IN ('WEB', 'YLW')
+  AND (
+      trnx_mode IN ('IMPS', 'NEFT', 'RTGS', 'SELF')
+      OR (trnx_mode = 'WITHINBOI' AND source_sys NOT IN ('PPF','SSY','INSUR','BILPMT','NPS'))
+  )
+GROUP BY trnx_mode
+
+UNION ALL
+
+-- 2. Fund Transfers (SI Scheduled)
+SELECT 
+    'Fund transfer'::VARCHAR AS service,
+    (CASE WHEN b.is_one_time = TRUE THEN 'SI-ONE TIME' ELSE 'SI-RECURRING' END)::VARCHAR AS type,
+    SUM(CASE WHEN a.trnx_status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN a.trnx_status = 'Success' THEN a.trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN a.trnx_status = 'Failed' AND a.trnx_status_desc NOT LIKE '%Maximum transfer limit%' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN a.trnx_status = 'Failed' AND a.trnx_status_desc NOT LIKE '%Maximum transfer limit%' THEN a.trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM moneymovement.tl_transaction_dtls a
+JOIN moneymovement.tl_scheduled_pymts b ON a.schedule_pymt_id = b.schedule_pymt_id
+CROSS JOIN report_dates d
+WHERE a.schedule_pymt_id IS NOT NULL 
+  AND TRUNC(a.created_dt) between month_start and today 
+  AND a.channel IN ('WEB', 'YLW')
+GROUP BY b.is_one_time
+
+UNION ALL
+
+-- 3. Credit-Card Payments
+SELECT 
+    'Credit-card Payment'::VARCHAR AS service,
+    'CC-Payment'::VARCHAR AS type,
+    SUM(CASE WHEN LOWER(status) IN ('success', 'successful') THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN LOWER(status) IN ('success', 'successful') THEN payment_amt::NUMERIC ELSE 0 END), 0) / 100.0, 2)::NUMERIC AS success_amount,
+    SUM(CASE WHEN LOWER(status) IN ('failure', 'failed') THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN LOWER(status) IN ('failure', 'failed') THEN payment_amt ::NUMERIC ELSE 0 END), 0) / 100.0, 2)::NUMERIC AS failed_amount
+FROM cards.tl_cc_pymt_trnx_dtls CROSS JOIN report_dates d
+WHERE TRUNC(created_dt)  between month_start and today  AND channel IN ('WEB', 'YLW')
+
+UNION ALL
+
+-- 4. SI Executed Breakdown
+
+SELECT 
+    'SI Executed'::VARCHAR AS service,
+	'ACTIVE'::VARCHAR AS type,
+    (SELECT COUNT(*) FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d  WHERE status='ACTIVE' AND TRUNC(created_dt)between month_start and today AND channel IN ('WEB','YLW'))::BIGINT AS success_count,
+	
+    (SELECT ROUND(CAST(COALESCE(SUM(CAST(trnx_amount AS NUMERIC)), 0) AS NUMERIC),0)  FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d where status='ACTIVE' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::NUMERIC AS sucess_amount  ,
+	0::BIGINT AS failed_count,
+	0::NUMERIC AS failed_amount
+UNION ALL
+SELECT 
+    'SI Executed'::VARCHAR AS service,
+	'COMPLETED'::VARCHAR AS type,
+    (SELECT COUNT(*) FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d  WHERE status='COMPLETED' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB','YLW'))::BIGINT AS success_count,
+	
+    (SELECT ROUND(CAST(COALESCE(SUM(CAST(trnx_amount AS NUMERIC)), 0) AS NUMERIC),0)  FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d where status='COMPLETED' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::NUMERIC AS sucess_amount  ,
+	0::BIGINT AS failed_count,
+	0::NUMERIC AS failed_amount
+
+UNION ALL
+SELECT 
+    'SI Executed'::VARCHAR AS service,
+	'CANCELLED'::VARCHAR AS type,
+    (SELECT COUNT(*) FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d  WHERE status='CANCELLED' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB','YLW'))::BIGINT AS success_count,
+	
+    (SELECT ROUND(CAST(COALESCE(SUM(CAST(trnx_amount AS NUMERIC)), 0) AS NUMERIC),0)  FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d where status='CANCELLED' AND TRUNC(created_dt)between month_start and today AND channel IN ('WEB', 'YLW'))::NUMERIC AS sucess_amount  ,
+	0::BIGINT AS failed_count,
+	0::NUMERIC AS failed_amount
+	
+UNION ALL
+
+SELECT 
+    'SI Executed'::VARCHAR AS service,
+	'PAUSED'::VARCHAR AS type,
+    (SELECT COUNT(*) FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d  WHERE status='PAUSED' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB','YLW'))::BIGINT AS success_count,
+	
+    (SELECT ROUND(CAST(COALESCE(SUM(CAST(trnx_amount AS NUMERIC)), 0) AS NUMERIC),0)  FROM moneymovement.tl_scheduled_pymts CROSS JOIN report_dates d where status='PAUSED' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::NUMERIC AS sucess_amount  ,
+	0::BIGINT AS failed_count,
+	0::NUMERIC AS failed_amount
+
+
+UNION ALL
+
+-- 5. TD Contribution (FD & RD)
+SELECT 
+    'TD Contribution'::VARCHAR AS service,
+    td_type::VARCHAR AS type,
+    SUM(CASE WHEN status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Success' THEN dep_amount ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Failed' THEN dep_amount ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM investment.tl_td_trnx_dtls CROSS JOIN report_dates d
+WHERE td_type IN ('FD', 'RD') AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW')
+GROUP BY td_type
+
+UNION ALL
+
+-- 6. PPF & SSY Contribution
+SELECT 
+    (CASE WHEN source_sys = 'PPF' THEN 'PPF Contribution' ELSE 'SSY Contribution' END)::VARCHAR AS service,
+    source_sys::VARCHAR AS type,
+    SUM(CASE WHEN trnx_status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN trnx_status = 'Success' THEN trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN trnx_status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN trnx_status = 'Failed' THEN trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM moneymovement.tl_transaction_dtls CROSS JOIN report_dates d
+WHERE source_sys IN ('PPF', 'SSY') AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW')
+GROUP BY source_sys
+
+UNION ALL
+
+-- 7. NPS-NSDL Contribution
+SELECT 
+    'NPS-NSDL Contribution'::VARCHAR AS service,
+    'NSDL Contribution'::VARCHAR AS type,
+    SUM(CASE WHEN status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Success' THEN total_amt ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Failed' THEN total_amt ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM investment.tl_nps_trnx_dtls CROSS JOIN report_dates d
+WHERE pop_code = '5000424' AND nps_schedule_pymt_id IS NULL AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW')
+
+UNION ALL
+
+-- 8. NPS-NSDL SI Recurring
+SELECT 
+    'NPS-NSDL Contribution'::VARCHAR AS service,
+    'NSDL-SI Recurring'::VARCHAR AS type,
+    SUM(CASE WHEN a.status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN a.status = 'Success' THEN a.total_amt ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN a.status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN a.status = 'Failed' THEN a.total_amt ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM investment.tl_nps_trnx_dtls a
+JOIN investment.tl_scheduled_nps_contribution_dtls b ON a.nps_schedule_pymt_id = b.nps_schedule_pymt_id
+CROSS JOIN report_dates d
+WHERE a.pop_code = '5000424' AND b.is_one_time = FALSE AND a.nps_schedule_pymt_id IS NOT NULL AND TRUNC(a.created_dt) between month_start and today AND a.channel IN ('WEB', 'YLW')
+
+UNION ALL
+
+-- 9. NPS-KFINTECH Contribution
+SELECT 
+    'NPS-KFINTECH Contribution'::VARCHAR AS service,
+    'Kfintech trnx'::VARCHAR AS type,
+    SUM(CASE WHEN status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Success' THEN total_amt ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Failed' THEN total_amt ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM investment.tl_nps_trnx_dtls CROSS JOIN report_dates d
+WHERE pop_code = '1000504' AND TRUNC(created_dt)  between month_start and today AND channel IN ('WEB', 'YLW')
+
+UNION ALL
+
+-- 10. SGB Contribution
+SELECT 
+    'SGB Contribution'::VARCHAR AS service,
+    'SGB'::VARCHAR AS type,
+    (SELECT COUNT(*) FROM investment.tl_sgb_trnx_dtls CROSS JOIN report_dates d WHERE status = 'SUCCESS' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::BIGINT AS success_count,
+    (SELECT ROUND(COALESCE(SUM(trans_amt), 0), 0) FROM investment.tl_sgb_trnx_dtls CROSS JOIN report_dates d WHERE status = 'SUCCESS' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::NUMERIC AS   success_amount,
+    (SELECT COUNT(*) FROM investment.tl_sgb_trnx_error_dtls CROSS JOIN report_dates d WHERE TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::BIGINT AS failed_count,
+    0::NUMERIC AS failed_amount
+
+UNION ALL
+
+-- 11. FRSB Contribution
+SELECT 
+    'FRSB Contribution'::VARCHAR AS service,
+    'FRSB'::VARCHAR AS type,
+    (SELECT COUNT(*) FROM investment.tl_frsb_trnx_dtls CROSS JOIN report_dates d WHERE status = 'SUCCESS' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::BIGINT AS success_count,
+    (SELECT ROUND(COALESCE(SUM(subs_amount), 0), 0) FROM investment.tl_frsb_trnx_dtls CROSS JOIN report_dates d WHERE status = 'SUCCESS' AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::NUMERIC AS success_amount,
+    (SELECT COUNT(*) FROM investment.tl_frsb_trnx_error_dtls CROSS JOIN report_dates d WHERE TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::BIGINT AS failed_count,
+    (SELECT ROUND(COALESCE(SUM(subscription_amt), 0), 0) FROM investment.tl_frsb_trnx_error_dtls CROSS JOIN report_dates d WHERE TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW'))::NUMERIC AS failed_amount
+
+UNION ALL
+
+-- 12. MF Lumpsum & NFO
+SELECT 
+    'MF-LUMSUM'::VARCHAR AS service,
+    'MF-LUMPSUM'::VARCHAR AS type,
+    (
+        SELECT COUNT(*) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE (isin_code NOT IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') OR isin_code IS NULL)
+          AND fund_trnx_id IS NOT NULL 
+          AND TRUNC(created_dt)  between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::BIGINT AS success_count,
+    (
+        SELECT ROUND(CAST(COALESCE(SUM(CAST(total_amt AS NUMERIC)), 0) AS NUMERIC), 0) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE (isin_code NOT IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') OR isin_code IS NULL)
+          AND fund_trnx_id IS NOT NULL 
+          AND TRUNC(created_dt)  between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::NUMERIC AS success_amount,
+    (
+        SELECT COUNT(*) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE (isin_code NOT IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') OR isin_code IS NULL)
+          AND fund_trnx_id IS NULL 
+          AND TRUNC(created_dt) between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::BIGINT AS failed_count,
+    (
+        SELECT ROUND(CAST(COALESCE(SUM(CAST(total_amt AS NUMERIC)), 0) AS NUMERIC), 0) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE (isin_code NOT IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') OR isin_code IS NULL)
+          AND fund_trnx_id IS NULL 
+          AND TRUNC(created_dt) between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::NUMERIC AS failed_amount
+
+UNION ALL
+
+SELECT 
+    'Multi Asset Allocation  Fund'::VARCHAR AS service,
+    'NFO'::VARCHAR AS type,
+    (
+        SELECT COUNT(*) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE isin_code IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') 
+          AND fund_trnx_id IS NOT NULL 
+          AND TRUNC(created_dt) between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::BIGINT AS success_count,
+    (
+        SELECT ROUND(CAST(COALESCE(SUM(CAST(total_amt AS NUMERIC)), 0) AS NUMERIC), 0) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE isin_code IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') 
+          AND fund_trnx_id IS NOT NULL 
+          AND TRUNC(created_dt) between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::NUMERIC AS success_amount,
+    (
+        SELECT COUNT(*) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE isin_code IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') 
+          AND fund_trnx_id IS NULL 
+          AND TRUNC(created_dt) between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::BIGINT AS failed_count,
+    (
+        SELECT ROUND(CAST(COALESCE(SUM(CAST(total_amt AS NUMERIC)), 0) AS NUMERIC), 0) 
+        FROM investment.tl_mf_transaction_dtls CROSS JOIN report_dates d 
+        WHERE isin_code IN ('INF761K01FW0','INF761K01FX8','INF761K01FY6') 
+          AND fund_trnx_id IS NULL 
+          AND TRUNC(created_dt) between month_start and today
+          AND channel IN ('WEB', 'YLW')
+    )::NUMERIC AS failed_amount
+
+UNION ALL
+
+-- 13. MF XSIP Order
+SELECT 
+    'MF XSIP Order'::VARCHAR AS service,
+    'MF-SIP'::VARCHAR AS type,
+    SUM(CASE WHEN sip_register_no IS NOT NULL THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN sip_register_no IS NOT NULL THEN sip_amount ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN sip_register_no IS NULL THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN sip_register_no IS NULL THEN sip_amount ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM investment.tl_mf_sip_master CROSS JOIN report_dates d
+WHERE TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW')
+
+UNION ALL
+
+
+
+
+-- 14. ASBA Application
+SELECT 
+    'ASBA Application'::VARCHAR AS service,
+    'ASBA'::VARCHAR AS type,
+    SUM(CASE WHEN bid_serial_number IS NOT NULL THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN bid_serial_number IS NOT NULL THEN highest_bid_value ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN bid_serial_number IS NULL THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN bid_serial_number IS NULL THEN highest_bid_value ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM investment.tl_ipo_cust_orders CROSS JOIN report_dates d
+WHERE TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW')
+
+UNION ALL
+
+-- 15. TD Closed (FD & RD)
+SELECT 
+    'TD Closed'::VARCHAR AS service,
+    (CASE WHEN td_type = 'FD' THEN 'FD-Closed' ELSE 'RD-Closed' END)::VARCHAR AS type,
+    SUM(CASE WHEN status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Success' THEN dep_amount ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN status = 'Failed' THEN dep_amount ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM investment.tl_td_closure_dtls CROSS JOIN report_dates d
+WHERE td_type IN ('FD', 'RD') AND TRUNC(created_dt) between month_start and today AND channel IN ('WEB', 'YLW')
+GROUP BY td_type
+
+UNION ALL
+
+-- 16. OD Contribution (FD & RD)
+
+SELECT 
+    'OD Contribution'::VARCHAR AS service,
+    v.td_type::VARCHAR AS type,
+    SUM(CASE WHEN t.status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN t.status = 'Success' THEN t.od_amount::NUMERIC ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN t.status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN t.status = 'Failed' THEN t.od_amount::NUMERIC ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM (VALUES ('FD'), ('RD')) AS v(td_type)
+LEFT JOIN report_dates d ON 1=1
+LEFT JOIN investment.tl_od_trnx_dtls t 
+    ON t.td_type = v.td_type 
+   AND TRUNC(t.created_dt) between month_start and today
+   AND t.channel IN ('WEB', 'YLW')
+GROUP BY v.td_type
+
+UNION ALL
+
+-- 17. Tax Payment Details
+SELECT 
+    tax_type::VARCHAR AS service,
+    'Tax'::VARCHAR AS type,
+    SUM(CASE WHEN UPPER(trnx_status) = 'SUCCESS' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN UPPER(trnx_status) = 'SUCCESS' THEN trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN UPPER(trnx_status) = 'FAILED' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN UPPER(trnx_status) = 'FAILED' THEN trnx_amount ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM moneymovement.tl_tax_pymt_dtls CROSS JOIN report_dates d
+WHERE TRUNC(created_dt) between month_start and today
+GROUP BY tax_type
+UNION ALL
+
+-- 18. BillPay BillDesk
+SELECT 
+    'BillPay BillDesk'::VARCHAR AS service,
+    (CASE WHEN pymt_type = 'AUTOPAY' THEN 'Autopay' ELSE 'BPAY' END)::VARCHAR AS type,
+    SUM(CASE WHEN trnx_status = 'Success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN trnx_status = 'Success' THEN debit_amount::NUMERIC ELSE 0 END), 0), 0)::NUMERIC AS success_amount,
+    SUM(CASE WHEN trnx_status = 'Failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN trnx_status = 'Failed' THEN debit_amount::NUMERIC ELSE 0 END), 0), 0)::NUMERIC AS failed_amount
+FROM moneymovement.tl_billpay_trnx_dtls CROSS JOIN report_dates d
+WHERE TRUNC(created_dt) between month_start and today
+GROUP BY CASE WHEN pymt_type = 'AUTOPAY' THEN 'Autopay' ELSE 'BPAY' END
+
+UNION ALL
+
+-- 19. Inward Payment Aggregators
+SELECT 
+    (CASE 
+        WHEN pid = '000000000001' THEN 'Bill Desk'
+        WHEN pid = '000000000002' THEN 'PayU'
+        WHEN pid = '000000000007' THEN 'NTTDATA'
+        WHEN pid = '000000000005' THEN 'Avenue Info'
+        WHEN pid = '000000000004' THEN 'Worldline'
+        ELSE 'SabPaisa' 
+    END)::VARCHAR AS service,
+    'Inward Aggregator'::VARCHAR AS type,
+    SUM(CASE WHEN LOWER(trnx_status) = 'success' THEN 1 ELSE 0 END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE WHEN LOWER(trnx_status) = 'success' THEN amt ELSE 0 END), 0), 2)::NUMERIC AS success_amount,
+    SUM(CASE WHEN LOWER(trnx_status) = 'failed' THEN 1 ELSE 0 END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE WHEN LOWER(trnx_status) = 'failed' THEN amt ELSE 0 END), 0), 2)::NUMERIC AS failed_amount
+FROM moneymovement.tl_inward_trnx_dtls CROSS JOIN report_dates d
+WHERE TRUNC(created_dt) between month_start and today
+GROUP BY CASE 
+    WHEN pid = '000000000001' THEN 'Bill Desk'
+    WHEN pid = '000000000002' THEN 'PayU'
+    WHEN pid = '000000000007' THEN 'NTTDATA'
+    WHEN pid = '000000000005' THEN 'Avenue Info'
+    WHEN pid = '000000000004' THEN 'Worldline'
+    ELSE 'SabPaisa' END 
+UNION ALL
+
+-- ##--
+
+SELECT 
+    v.service::VARCHAR AS service,
+    v.type::VARCHAR AS type,
+    -- Success metrics
+    COUNT(CASE 
+        WHEN v.is_sudlife = FALSE AND t.policy_no IS NOT NULL THEN 1
+        WHEN v.is_sudlife = TRUE  AND s.created_dt IS NOT NULL AND s.error_desc IS NULL THEN 1
+    END)::BIGINT AS success_count,
+    ROUND(COALESCE(SUM(CASE 
+        WHEN v.is_sudlife = FALSE AND t.policy_no IS NOT NULL THEN t.proposal_amt::NUMERIC
+        WHEN v.is_sudlife = TRUE  AND s.created_dt IS NOT NULL AND s.error_desc IS NULL THEN s.tot_premium_with_tax::NUMERIC
+        ELSE 0 
+    END), 0), 0)::NUMERIC AS success_amount,
+    -- Failed metrics
+    COUNT(CASE 
+        WHEN v.is_sudlife = FALSE AND t.created_dt IS NOT NULL AND t.policy_no IS NULL THEN 1
+        WHEN v.is_sudlife = TRUE  AND s.created_dt IS NOT NULL AND s.error_desc IS NOT NULL THEN 1
+    END)::BIGINT AS failed_count,
+    ROUND(COALESCE(SUM(CASE 
+        WHEN v.is_sudlife = FALSE AND t.created_dt IS NOT NULL AND t.policy_no IS NULL THEN t.proposal_amt::NUMERIC
+        WHEN v.is_sudlife = TRUE  AND s.created_dt IS NOT NULL AND s.error_desc IS NOT NULL THEN s.tot_premium_with_tax::NUMERIC
+        ELSE 0 
+    END), 0), 0)::NUMERIC AS failed_amount
+FROM (
+    VALUES 
+        ('Insurance Purchase Contribution', 'INSUR Reliance Health Premium', 'Reliance', 'health', FALSE),
+        ('Insurance Purchase Contribution', 'INSUR Reliance Vehicle Premium', 'Reliance', 'vehicle', FALSE),
+        ('Insurance Sudlife Purchase Contribution', 'SUDLIFE', NULL, NULL, TRUE)
+) AS v(service, type, partner_name, prdct_type, is_sudlife)
+LEFT JOIN report_dates d ON 1=1
+-- Join standard insurance table
+LEFT JOIN investment.tl_ins_purchase_dtls t 
+    ON v.is_sudlife = FALSE
+   AND t.partner_name = v.partner_name 
+   AND t.prdct_type = v.prdct_type
+   AND TRUNC(t.created_dt) between month_start and today
+   AND t.channel IN ('WEB', 'YLW')
+-- Join SUDLIFE insurance table
+LEFT JOIN investment.tl_ins_sudlife_purchase_dtls s 
+    ON v.is_sudlife = TRUE
+   AND TRUNC(s.created_dt)between month_start and today
+   AND s.channel IN ('WEB', 'YLW')
+GROUP BY v.service, v.type
+
+union all
+SELECT 
+    v.service::VARCHAR AS service,
+    v.type::VARCHAR AS type,
+    -- Success counts from customer profile tables
+    COUNT(CASE 
+        WHEN v.account_type = 'PPF' AND p.created_dt IS NOT NULL THEN 1
+        WHEN v.account_type = 'SSY' AND s.created_dt IS NOT NULL THEN 1
+    END)::BIGINT AS success_count,
+    0::NUMERIC AS success_amount,
+    -- Failed counts from registration error tables
+    COUNT(CASE 
+        WHEN v.account_type = 'PPF' AND pe.created_dt IS NOT NULL THEN 1
+        WHEN v.account_type = 'SSY' AND se.created_dt IS NOT NULL THEN 1
+    END)::BIGINT AS failed_count,
+    0::NUMERIC AS failed_amount
+FROM (
+    VALUES 
+        ('PPF Opened', 'PPF-Opened', 'PPF'),
+        ('SSY Opened', 'SSY-Opened', 'SSY')
+) AS v(service, type, account_type)
+LEFT JOIN report_dates d ON 1=1
+-- PPF Success Table
+LEFT JOIN investment.tl_ppf_cust_profile p
+    ON v.account_type = 'PPF'
+   AND TRUNC(p.created_dt) between month_start and today
+   AND p.channel IN ('WEB', 'YLW')
+-- PPF Error Table
+LEFT JOIN investment.tl_ppf_regs_error_dtls pe
+    ON v.account_type = 'PPF'
+   AND TRUNC(pe.created_dt) between month_start and today
+   AND pe.channel IN ('WEB', 'YLW')
+-- SSY Success Table
+LEFT JOIN investment.tl_ssy_cust_profile s
+    ON v.account_type = 'SSY'
+   AND TRUNC(s.created_dt) between month_start and today
+   AND s.channel IN ('WEB', 'YLW')
+-- SSY Error Table
+LEFT JOIN investment.tl_ssy_regs_error_dtls se
+    ON v.account_type = 'SSY'
+   AND TRUNC(se.created_dt) between month_start and today
+   AND se.channel IN ('WEB', 'YLW')
+GROUP BY v.service, v.type 
+
+-- ###Kfintech and NSDl Account Opened
+UNION ALL
+
+SELECT 
+    t.service_name::VARCHAR AS service,
+    t.type_name::VARCHAR AS type,
+    
+    -- Success Metrics
+    COALESCE(SUM(
+        CASE 
+            WHEN UPPER(TRIM(p.cra_name)) = t.cra_code 
+             AND p.acct_added_by = 'A' 
+             AND p.pran_no IS NOT NULL 
+            THEN 1 ELSE 0 
+        END
+    ), 0)::BIGINT AS success_count,
+    
+    0::NUMERIC AS success_amount,
+    
+    -- Failed Metrics
+    0::NUMERIC AS failed_count,
+    
+    0::NUMERIC AS failed_amount
+
+FROM cra_targets t
+
+LEFT JOIN investment.tl_nps_cust_profile p
+CROSS JOIN report_dates d
+    ON UPPER(TRIM(p.cra_name)) = t.cra_code
+   AND TRUNC(p.created_dt) between d.month_start and d.today
+   AND UPPER(TRIM(p.channel)) in ('WEB', 'YLW')
+GROUP BY t.service_name, t.type_name, t.cra_code
+ORDER BY service;
+
+
+
+
+
+
+
+
+
+

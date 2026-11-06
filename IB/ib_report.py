@@ -1,16 +1,14 @@
 from openpyxl.utils import get_column_letter
 from REPORTS.utlis import *
-import datetime
+from REPORTS.report_date import sheet_headers
 from openpyxl.cell.cell import MergedCell
 from IB.ib_headers import section1,section2
 exception_rows=[5,28,31,44,45,46,51,62]
-def ib_generate_report(ws):
+def ib_generate_report(ws, report_date=None):
     headers_map={}
     current_row=5
     # 1. Main Headers
-    date = datetime.date.today().strftime(format="%d-%m-%Y")
-    left_header = date
-    right_header = f"MTD (1st to {date.split('-')[0]} July)"
+    left_header, right_header = sheet_headers(report_date)
     top_header(ws, "Summary Report", left_header, right_header)
 
     first_report_header(ws,3)
