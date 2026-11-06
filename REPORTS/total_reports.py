@@ -23,30 +23,14 @@ REPORTS_DIR = os.path.abspath(r"/home/yashraj/reports")
 def report_generation():
     while True:
         print("==================================================")
-        print("      STEP 2: TRANSFORM & REPORT GENERATION       ")
+        print("              REPORT GENERATION                   ")
         print("==================================================")
         print("\nNOTE: Ensure 01_extractor.py has finished dumping raw CSVs")
-        print("into staging_csv directories before proceeding.\n")
-        print("A. Generate Night Report")
-        print("B. Generate Day Report")
-        print("C. Exit")
-
-        choice = input("\nSelect Option (A, B, or C): ").strip().upper()
-
-        if choice == "A":
-            csv_directory = os.path.abspath(r"/home/yashraj/reports/night_staging_csv")
-            report_name = "Night_Transaction_Report.xlsx"
-        elif choice == "B":
-            csv_directory = os.path.abspath(r"/home/yashraj/reports/day_staging_csv")
-            report_name = "Day_Transaction_Report.xlsx"
-        elif choice == "C":
-            print("Exiting Report Generator.")
-            break
-        else:
-            print("❌ Invalid selection. Please enter A, B, or C.\n")
-            continue  # Prevents execution of downstream code when input is invalid
+        print("into the staging folder before proceeding.\n")
 
         report_date = prompt_report_date()
+        csv_directory = os.path.abspath(r"/home/yashraj/reports/night_staging_csv")
+        report_name = "Transaction_Report.xlsx"
 
         os.makedirs(REPORTS_DIR, exist_ok=True)
         final_excel_path = os.path.join(REPORTS_DIR, report_name)

@@ -33,9 +33,7 @@ def load_sql(file_path_queries, filename: str):
     with open(filepath, "r", encoding="utf-8") as f:
         return f.read().strip()
 
-report_timeline = NIGHT_REPORT_PIPELINE_STEPS
-sql_dir = os.path.abspath(r"/home/yashraj/reports/night_queries")
-staging_dir = os.path.abspath(r"/home/yashraj/reports/night_staging_csv")
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 env_path = '/home/yashraj/reports/.env'
 
@@ -61,6 +59,10 @@ POSTGRES_CONFIG = {
 conn = None
 cursor = None
 report_date = prompt_report_date()
+report_timeline = NIGHT_REPORT_PIPELINE_STEPS
+sql_dir = os.path.join(PROJECT_ROOT, "night_queries")
+staging_dir = os.path.abspath(r"/home/yashraj/reports/night_staging_csv")
+logger.info(f"Reading queries from: {sql_dir}")
 
 try:
     logger.info("Connecting to Database...")

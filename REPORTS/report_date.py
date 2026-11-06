@@ -14,8 +14,20 @@ _MONTH_START_EXPR = re.compile(
     r"DATE_TRUNC\(\s*'month'\s*,\s*CURRENT_DATE\s*\)\s*::\s*DATE",
     re.IGNORECASE,
 )
-_BETWEEN_YESTERDAY = re.compile(
-    r"(between\s+(?:d\.)?month_start\s+and\s+)(?:d\.)?yesterday\b",
+_TODAY_PAREN_EXPR = re.compile(
+    r"\(\s*CURRENT_DATE\s*\)\s*::\s*DATE",
+    re.IGNORECASE,
+)
+_TODAY_EXPR = re.compile(
+    r"CURRENT_DATE\s*::\s*DATE",
+    re.IGNORECASE,
+)
+_BARE_CURRENT_DATE = re.compile(
+    r"CURRENT_DATE\b",
+    re.IGNORECASE,
+)
+_BETWEEN_END = re.compile(
+    r"(between\s+(?:d\.)?month_start\s+and\s+)(?:d\.)?(?:yesterday|today)\b",
     re.IGNORECASE,
 )
 
@@ -23,12 +35,10 @@ _BETWEEN_YESTERDAY = re.compile(
 def prompt_report_date():
     """Ask for DD-MM-YYYY. Enter keeps the queries on CURRENT_DATE - 1."""
     while True:
-        raw = input(
-            "\nEnter report date (DD-MM-YYYY), or press Enter to keep yesterday: "
-        ).strip()
+        raw = input("\nEnter report date (DD-MM-YYYY): ").strip()
         if raw == "":
-            print("Using the existing yesterday date from the queries.")
-            return None
+            print("Enter a date, for example 05-10-2026.")
+            continue
         try:
             report_date = datetime.datetime.strptime(raw, "%d-%m-%Y").date()
         except ValueError:
@@ -70,12 +80,15 @@ def apply_report_date(sql, filename, report_date):
         yesterday_value = report_date
         month_start_value = report_date
 
+    sql = _MONTH_START_EXPR.sub(_date_literal(month_start_value), sql)
     sql = _YESTERDAY_EXPR.sub(_date_literal(yesterday_value), sql)
     sql = _CURRENT_DATE_MINUS_ONE.sub(_date_literal(report_date), sql)
-    sql = _MONTH_START_EXPR.sub(_date_literal(month_start_value), sql)
+    sql = _TODAY_PAREN_EXPR.sub(_date_literal(yesterday_value), sql)
+    sql = _TODAY_EXPR.sub(_date_literal(yesterday_value), sql)
+    sql = _BARE_CURRENT_DATE.sub(_date_literal(yesterday_value), sql)
 
     if kind == "mixed":
-        sql = _BETWEEN_YESTERDAY.sub(rf"\1{_date_literal(month_end)}", sql)
+        sql = _BETWEEN_END.sub(rf"\1{_date_literal(month_end)}", sql)
     return sql
 
 
