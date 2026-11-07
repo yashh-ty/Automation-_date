@@ -1,3 +1,4 @@
+--testing
 WITH report_dates AS (
     SELECT (CURRENT_DATE - 1)::DATE AS yesterday
 )
