@@ -54,20 +54,8 @@ NIGHT_REPORT_PIPELINE_STEPS = {
     "REGISTRATION QUERY 3":{"sql_file": "night_registration_query_3.txt"},
 }
 
-DAY_REPORT_PIPELINE_STEPS = {
-    "IB QUERY DAILY" :{"sql_file": "night_ib_query_daily.txt"},
-    "IB MONTHLY QUERY":{"sql_file": "night_ib_query_monthly.txt"},
-    "IB STATE TAX":{"sql_file": "night_ib_state_tax.txt"},
-    "IB TIN AND GST":{"sql_file": "night_ib_tin_and_gst.txt"},
-    "MB QUERY DAILY":{"sql_file": "night_mb_query_daily.txt"},
-    "MB MONTHLY QUERY":{"sql_file": "night_mb_query_monthly.txt"},
-    "CORP QUERY DAILY":{"sql_file": "night_corp_query_daily.txt"},
-    "CORP QUERY MONTHLY":{"sql_file": "night_corp_query_monthly.txt"},
-    "CORP STATE TAX":{"sql_file": "night_corp_state_tax.txt"},
-    "REGISTRATION QUERY 1":{"sql_file": "night_registration_query_1.txt"},
-    "REGISTRATION QUERY 2":{"sql_file": "night_registration_query_2.txt"},
-    "REGISTRATION QUERY 3":{"sql_file": "night_registration_query_3.txt"},
-}
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+NIGHT_SQL_DIR = os.path.join(PROJECT_ROOT, "night_queries")
 
 
 
@@ -85,21 +73,16 @@ def load_sql(file_path_queries,filename: str):
         return f.read().strip()
 
 
-#Report Timeline are only NIGHT_REPORT_PIPELINE_STEPS  or DAY_REPORT_PIPELINE_STEPS  depending on them there are
-#different queries stored in different file_paths
-
-def extract_and_dump_csv(report_timeline, pipeline_type, report_date=None):
+def extract_and_dump_csv(report_timeline, report_date=None):
     """Executes SQL queries and writes exact result sets directly to CSV files."""
     # os.makedirs(STAGING_CSV_DIR, exist_ok=True)
     conn = None
     cursor = None
 
-    if pipeline_type== 'NIGHT_REPORT_PIPELINE_STEPS':
-            sql_dir = os.path.abspath(r"/home/yashraj/reports/night_queries")
-            staging_dir= os.path.abspath(r"/home/yashraj/reports/night_staging_csv")
-    else:
-            sql_dir = os.path.abspath(r"/home/yashraj/reports/day_queries")
-            staging_dir = os.path.abspath(r"/home/yashraj/reports/day_staging_csv")
+    sql_dir = NIGHT_SQL_DIR
+    staging_dir = os.path.abspath(r"/home/yashraj/reports/night_staging_csv")
+
+    logger.info(f"Reading queries from: {sql_dir}")
 
 
     try:
@@ -156,43 +139,18 @@ def extract_and_dump_csv(report_timeline, pipeline_type, report_date=None):
 
 def run_extraction_cli():
     print("==================================================")
-    print("      STEP 1: DATA EXTRACTION & STAGING MENU      ")
+    print("           DATA EXTRACTION & STAGING              ")
     print("==================================================")
-    print("A. For Night-Report data download from DB")
-    print("B. For Day-Report data download from DB")
 
-
-    choice = input("\nSelect Option (A or B): ").strip().upper()
-
-    if choice in ("A", "B"):
-        report_date = prompt_report_date()
-    else:
-        report_date = None
-
-    if choice == "A":
-        success = extract_and_dump_csv(NIGHT_REPORT_PIPELINE_STEPS, 'NIGHT_REPORT_PIPELINE_STEPS', report_date)
-        if success:
-            print("Now you can successfully run the report_generation.bat file ")
-            return True
-        else:
-            print("Please run queries manually inside the night_queries Folder \n"
-                  "Keep name of the csv files same as the .sql file \n"
-                  "Place exported CSVs into './night_staging_csv/', and then only run report_generation.py.")
-            return False
-
-    elif choice == "B":
-        success = extract_and_dump_csv(DAY_REPORT_PIPELINE_STEPS, 'DAY_REPORT_PIPELINE_STEPS', report_date)
-        if success:
-            print("Now you can successfully run the report_generation.bat file ")
-            return True
-        else:
-            print("Please run queries manually inside the day_queries Folder \n"
-                  "Keep name of the csv files same as the .sql file \n"
-                  "Place exported CSVs into './day_staging_csv/', and then only run report_generation.bat")
-            return False
-    else:
-        print("\n Invalid choice. Exiting.")
-        return False
+    report_date = prompt_report_date()
+    success = extract_and_dump_csv(NIGHT_REPORT_PIPELINE_STEPS, report_date)
+    if success:
+        print("Now you can successfully run the report_generation.bat file ")
+        return True
+    print("Please run queries manually inside the night_queries Folder \n"
+          "Keep name of the csv files same as the .sql file \n"
+          "Place exported CSVs into './night_staging_csv/', and then only run report_generation.py.")
+    return False
 
 
 if __name__ == "__main__":
